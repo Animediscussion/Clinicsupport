@@ -11,3 +11,20 @@ function ProtectedRoute({ children }) {
 }
 
 export default ProtectedRoute;
+
+/* import { Navigate } from "react-router-dom";
+
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem("token");
+
+  // TEMP: allow access without authentication
+  const tempAccess = true;
+
+  if (!token && !tempAccess) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+export default ProtectedRoute; */
