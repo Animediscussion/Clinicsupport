@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const patientSchema = new mongoose.Schema(
   {
@@ -8,38 +8,30 @@ const patientSchema = new mongoose.Schema(
       trim: true,
     },
 
-    age: {
-      type: Number,
-      required: true,
-    },
-
-    gender: {
-      type: String,
-      enum: ["Male", "Female", "Other"],
-      required: true,
-    },
-
     phone: {
       type: String,
       required: true,
+      trim: true,
     },
 
     email: {
       type: String,
-      trim: true,
       lowercase: true,
+      trim: true,
+    },
+
+    dateOfBirth: {
+      type: Date,
+    },
+
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
     },
 
     address: {
       type: String,
-    },
-
-    bloodGroup: {
-      type: String,
-    },
-
-    medicalHistory: {
-      type: String,
+      trim: true,
     },
   },
   {
@@ -47,4 +39,6 @@ const patientSchema = new mongoose.Schema(
   },
 );
 
-module.exports = mongoose.model("Patient", patientSchema);
+const Patient = mongoose.model("Patient", patientSchema);
+
+export default Patient;

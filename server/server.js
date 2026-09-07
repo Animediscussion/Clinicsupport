@@ -4,6 +4,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import doctorRoutes from "./routes/doctorRoutes.js";
+import patientRoutes from "./routes/patientRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
 
@@ -15,6 +17,8 @@ app.use(express.json());
 
 // Routes
 app.use("/api/doctors", doctorRoutes);
+app.use("/api/patients", patientRoutes);
+app.use("/api/auth", authRoutes);
 
 // Test route
 app.get("/", (req, res) => {
