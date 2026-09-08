@@ -1,6 +1,6 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
-const appointmentSchema = new mongoose.Schema(
+const billSchema = new mongoose.Schema(
   {
     patient: {
       type: mongoose.Schema.Types.ObjectId,
@@ -8,28 +8,33 @@ const appointmentSchema = new mongoose.Schema(
       required: true,
     },
 
-    doctor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Doctor",
+    amount: {
+      type: Number,
       required: true,
+      min: 0,
     },
 
-    date: {
-      type: Date,
-      required: true,
-    },
-
-    reason: {
+    description: {
       type: String,
+      trim: true,
     },
 
     status: {
       type: String,
-      enum: ["Scheduled", "Completed", "Cancelled"],
-      default: "Scheduled",
+      enum: ["Pending", "Paid"],
+      default: "Pending",
+    },
+
+    paymentMethod: {
+      type: String,
+      enum: ["Cash", "Card", "UPI", "Insurance"],
     },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+  },
 );
 
-module.exports = mongoose.model("Appointment", appointmentSchema);
+const Bill = mongoose.model("Bill", billSchema);
+
+export default Bill;
