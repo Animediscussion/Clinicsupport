@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const billSchema = new mongoose.Schema(
+const appointmentSchema = new mongoose.Schema(
   {
     patient: {
       type: mongoose.Schema.Types.ObjectId,
@@ -8,26 +8,25 @@ const billSchema = new mongoose.Schema(
       required: true,
     },
 
-    amount: {
-      type: Number,
+    doctor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Doctor",
       required: true,
-      min: 0,
     },
 
-    description: {
+    date: {
+      type: Date,
+      required: true,
+    },
+
+    reason: {
       type: String,
-      trim: true,
     },
 
     status: {
       type: String,
-      enum: ["Pending", "Paid"],
-      default: "Pending",
-    },
-
-    paymentMethod: {
-      type: String,
-      enum: ["Cash", "Card", "UPI", "Insurance"],
+      enum: ["Scheduled", "Completed", "Cancelled"],
+      default: "Scheduled",
     },
   },
   {
@@ -35,6 +34,6 @@ const billSchema = new mongoose.Schema(
   },
 );
 
-const Bill = mongoose.model("Bill", billSchema);
+const Appointment = mongoose.model("Appointment", appointmentSchema);
 
-export default Bill;
+export default Appointment;
