@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const prescriptionSchema = new mongoose.Schema(
   {
@@ -42,4 +42,6 @@ const prescriptionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model("Prescription", prescriptionSchema);
+const Prescription = mongoose.model("Prescription", prescriptionSchema);
+
+export default Prescription;
