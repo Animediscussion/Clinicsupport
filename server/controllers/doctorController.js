@@ -75,7 +75,15 @@ export const updateDoctor = async (req, res) => {
 // Delete doctor
 export const deleteDoctor = async (req, res) => {
   try {
-    const doctor = await Doctor.findByIdAndDelete(req.params.id);
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: "inactive",
+      },
+      {
+        new: true,
+      },
+    );
 
     if (!doctor) {
       return res.status(404).json({
@@ -84,11 +92,12 @@ export const deleteDoctor = async (req, res) => {
     }
 
     res.json({
-      message: "Doctor deleted successfully",
+      message: "Doctor marked as inactive",
+      doctor,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to delete doctor",
+      message: "Failed to deactivate doctor",
     });
   }
 };

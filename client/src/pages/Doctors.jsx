@@ -17,6 +17,8 @@ import {
   SimpleGrid,
 } from "@mantine/core";
 
+import { TimeInput } from "@mantine/dates";
+
 import { IconPlus, IconEdit, IconTrash } from "@tabler/icons-react";
 
 import { useEffect, useState } from "react";
@@ -28,6 +30,8 @@ function Doctors() {
   const [loading, setLoading] = useState(true);
 
   const [opened, setOpened] = useState(false);
+  const [editingDoctor, setEditingDoctor] = useState(null);
+  const [deleteDoctorId, setDeleteDoctorId] = useState(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -41,6 +45,21 @@ function Doctors() {
     startTime: "",
     endTime: "",
   });
+
+  const resetForm = () => {
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+      specialization: "",
+      qualification: "",
+      experience: 0,
+      consultationFee: 0,
+      days: [],
+      startTime: "",
+      endTime: "",
+    });
+  };
 
   const fetchDoctors = async () => {
     try {
@@ -67,40 +86,104 @@ function Doctors() {
 
   const handleSubmit = async () => {
     try {
-      await api.post("/doctors", {
+      if (!form.name.trim()) {
+        alert("Doctor name is required");
+        return;
+      }
+
+      if (!form.email.trim()) {
+        alert("Email is required");
+        return;
+      }
+
+      if (!form.phone.trim()) {
+        alert("Phone number is required");
+        return;
+      }
+
+      if (!form.specialization) {
+        alert("Specialization is required");
+        return;
+      }
+
+      if (!form.qualification.trim()) {
+        alert("Qualification is required");
+        return;
+      }
+
+      const doctorData = {
         name: form.name,
         email: form.email,
         phone: form.phone,
         specialization: form.specialization,
         qualification: form.qualification,
-        experience: form.experience,
-        consultationFee: form.consultationFee,
+        experience: Number(form.experience),
+        consultationFee: Number(form.consultationFee),
 
         availability: {
           days: form.days,
           startTime: form.startTime,
           endTime: form.endTime,
         },
-      });
+      };
+
+      if (editingDoctor) {
+        await api.put(`/doctors/${editingDoctor._id}`, doctorData);
+      } else {
+        await api.post("/doctors", doctorData);
+      }
 
       setOpened(false);
 
-      setForm({
-        name: "",
-        email: "",
-        phone: "",
-        specialization: "",
-        qualification: "",
-        experience: 0,
-        consultationFee: 0,
-        days: [],
-        startTime: "",
-        endTime: "",
-      });
+      setEditingDoctor(null);
+
+      resetForm();
 
       fetchDoctors();
     } catch (error) {
-      console.error(error);
+      console.error("Doctor save error:", error);
+
+      alert(error.response?.data?.message || "Something went wrong");
+    }
+  };
+
+  const handleEdit = (doctor) => {
+    setEditingDoctor(doctor);
+
+    setForm({
+      name: doctor.name || "",
+      email: doctor.email || "",
+      phone: doctor.phone || "",
+      specialization: doctor.specialization || "",
+      qualification: doctor.qualification || "",
+      experience: doctor.experience || 0,
+      consultationFee: doctor.consultationFee || 0,
+
+      days: doctor.availability?.days || [],
+
+      startTime: doctor.availability?.startTime || "",
+
+      endTime: doctor.availability?.endTime || "",
+    });
+
+    setOpened(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteDoctorId) {
+      return;
+    }
+
+    try {
+      await api.delete(`/doctors/${deleteDoctorId}`);
+
+      setDeleteDoctorId(null);
+
+      fetchDoctors();
+    } catch (error) {
+      console.error("Delete doctor error:", error);
+
+      alert(error.response?.data?.message || "Failed to delete doctor");
     }
   };
 
@@ -175,7 +258,10 @@ function Doctors() {
 
                   <Table.Td>
                     <Group gap="xs">
-                      <ActionIcon variant="light">
+                      <ActionIcon
+                        variant="light"
+                        onClick={() => handleEdit(doctor)}
+                      >
                         <IconEdit size={17} />
                       </ActionIcon>
 
@@ -195,8 +281,12 @@ function Doctors() {
 
       <Modal
         opened={opened}
-        onClose={() => setOpened(false)}
-        title="Add New Doctor"
+        onClose={() => {
+          setOpened(false);
+          setEditingDoctor(null);
+          resetForm();
+        }}
+        title={editingDoctor ? "Edit Doctor" : "Add New Doctor"}
         size="lg"
       >
         <Stack>
@@ -310,7 +400,33 @@ function Doctors() {
               Cancel
             </Button>
 
-            <Button onClick={handleSubmit}>Add Doctor</Button>
+            <Button onClick={handleSubmit}>
+              {editingDoctor ? "Update Doctor" : "Add Doctor"}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+      <Modal
+        opened={Boolean(deleteDoctorId)}
+        onClose={() => setDeleteDoctorId(null)}
+        title="Delete Doctor"
+        centered
+      >
+        <Stack>
+          <Text>Are you sure you want to delete this doctor?</Text>
+
+          <Text size="sm" c="dimmed">
+            This action cannot be undone.
+          </Text>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleteDoctorId(null)}>
+              Cancel
+            </Button>
+
+            <Button color="red" onClick={handleDelete}>
+              Delete Doctor
+            </Button>
           </Group>
         </Stack>
       </Modal>
