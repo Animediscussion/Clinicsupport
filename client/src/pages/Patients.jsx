@@ -1,60 +1,84 @@
+import { useEffect, useState } from "react";
 import {
-  Container,
-  Title,
-  Text,
-  Group,
-  Button,
-  Paper,
-  Table,
-  Badge,
   ActionIcon,
-  TextInput,
+  Alert,
+  Badge,
+  Button,
+  Group,
   Modal,
-  Stack,
+  Paper,
+  ScrollArea,
   SimpleGrid,
-  Select,
+  Stack,
+  Table,
+  Text,
+  TextInput,
   Textarea,
+  Select,
   NumberInput,
+  Title,
 } from "@mantine/core";
 
-import { IconPlus, IconSearch, IconEdit, IconTrash } from "@tabler/icons-react";
-
-import { useEffect, useState } from "react";
+import {
+  IconPlus,
+  IconSearch,
+  IconEdit,
+  IconTrash,
+  IconEye,
+  IconAlertCircle,
+} from "@tabler/icons-react";
 
 import api from "../services/api";
+
+const initialForm = {
+  name: "",
+  dateOfBirth: "",
+  age: "",
+  gender: "",
+  bloodGroup: "",
+  phone: "",
+  email: "",
+  address: "",
+  emergencyName: "",
+  emergencyRelationship: "",
+  emergencyPhone: "",
+  allergies: "",
+  medicalHistory: "",
+};
 
 function Patients() {
   const [patients, setPatients] = useState([]);
   const [search, setSearch] = useState("");
 
   const [opened, setOpened] = useState(false);
+  const [editingPatient, setEditingPatient] = useState(null);
 
-  const [form, setForm] = useState({
-    name: "",
-    dateOfBirth: "",
-    age: "",
-    gender: "",
-    bloodGroup: "Unknown",
+  const [viewOpened, setViewOpened] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
 
-    phone: "",
-    email: "",
-    address: "",
+  const [deleteOpened, setDeleteOpened] = useState(false);
+  const [deletePatientId, setDeletePatientId] = useState(null);
 
-    emergencyName: "",
-    emergencyRelationship: "",
-    emergencyPhone: "",
+  const [form, setForm] = useState(initialForm);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    allergies: "",
-    medicalHistory: "",
-  });
-
+  // --------------------------------
+  // Fetch patients
+  // --------------------------------
   const fetchPatients = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const response = await api.get("/patients");
 
       setPatients(response.data);
-    } catch (error) {
-      console.error("Patient fetch error:", error);
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || "Unable to load patients.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,120 +86,244 @@ function Patients() {
     fetchPatients();
   }, []);
 
+  // --------------------------------
+  // Form change
+  // --------------------------------
   const handleChange = (field, value) => {
-    setForm((previous) => ({
-      ...previous,
+    setForm((prev) => ({
+      ...prev,
       [field]: value,
     }));
   };
 
+  // --------------------------------
+  // Reset form
+  // --------------------------------
   const resetForm = () => {
-    setForm({
-      name: "",
-      dateOfBirth: "",
-      age: "",
-      gender: "",
-      bloodGroup: "Unknown",
-
-      phone: "",
-      email: "",
-      address: "",
-
-      emergencyName: "",
-      emergencyRelationship: "",
-      emergencyPhone: "",
-
-      allergies: "",
-      medicalHistory: "",
-    });
+    setForm(initialForm);
+    setEditingPatient(null);
+    setError("");
   };
 
-  const handleSubmit = async () => {
-    if (!form.name.trim()) {
-      alert("Patient name is required");
-      return;
-    }
+  // --------------------------------
+  // Open Add Patient
+  // --------------------------------
+  const handleAdd = () => {
+    resetForm();
+    setOpened(true);
+  };
 
-    if (!form.gender) {
-      alert("Gender is required");
-      return;
+  // --------------------------------
+  // Open Edit Patient
+  // --------------------------------
+  const handleEdit = (patient) => {
+    setEditingPatient(patient);
+
+    setForm({
+      name: patient.name || "",
+      dateOfBirth: patient.dateOfBirth ? patient.dateOfBirth.slice(0, 10) : "",
+      age: patient.age ?? "",
+      gender: patient.gender || "",
+      bloodGroup: patient.bloodGroup || "",
+      phone: patient.phone || "",
+      email: patient.email || "",
+      address: patient.address || "",
+
+      emergencyName: patient.emergencyContact?.name || "",
+
+      emergencyRelationship: patient.emergencyContact?.relationship || "",
+
+      emergencyPhone: patient.emergencyContact?.phone || "",
+
+      allergies: patient.allergies || "",
+      medicalHistory: patient.medicalHistory || "",
+    });
+
+    setError("");
+    setOpened(true);
+  };
+
+  // --------------------------------
+  // Validation
+  // --------------------------------
+  const validateForm = () => {
+    if (!form.name.trim()) {
+      return "Patient name is required.";
     }
 
     if (!form.phone.trim()) {
-      alert("Phone number is required");
+      return "Phone number is required.";
+    }
+
+    if (!form.gender) {
+      return "Please select gender.";
+    }
+
+    if (!form.bloodGroup) {
+      return "Please select blood group.";
+    }
+
+    if (form.email && !form.email.includes("@")) {
+      return "Please enter a valid email address.";
+    }
+
+    return "";
+  };
+
+  // --------------------------------
+  // Add / Update Patient
+  // --------------------------------
+  const handleSubmit = async () => {
+    const validationError = validateForm();
+
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
+    const patientData = {
+      name: form.name.trim(),
+      dateOfBirth: form.dateOfBirth || undefined,
+      age: form.age === "" || form.age === null ? undefined : Number(form.age),
+
+      gender: form.gender,
+      bloodGroup: form.bloodGroup,
+
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      address: form.address.trim(),
+
+      emergencyContact: {
+        name: form.emergencyName.trim(),
+        relationship: form.emergencyRelationship.trim(),
+        phone: form.emergencyPhone.trim(),
+      },
+
+      allergies: form.allergies.trim(),
+      medicalHistory: form.medicalHistory.trim(),
+    };
+
     try {
-      const patientData = {
-        name: form.name,
-        dateOfBirth: form.dateOfBirth || undefined,
-        age: form.age ? Number(form.age) : undefined,
-        gender: form.gender,
-        bloodGroup: form.bloodGroup,
+      setLoading(true);
+      setError("");
 
-        phone: form.phone,
-        email: form.email,
-        address: form.address,
-
-        emergencyContact: {
-          name: form.emergencyName,
-          relationship: form.emergencyRelationship,
-          phone: form.emergencyPhone,
-        },
-
-        allergies: form.allergies,
-        medicalHistory: form.medicalHistory,
-      };
-
-      await api.post("/patients", patientData);
+      if (editingPatient) {
+        await api.put(`/patients/${editingPatient._id}`, patientData);
+      } else {
+        await api.post("/patients", patientData);
+      }
 
       setOpened(false);
       resetForm();
 
       await fetchPatients();
-    } catch (error) {
-      console.error("Create patient error:", error);
+    } catch (err) {
+      console.error(err);
 
-      alert(error.response?.data?.message || "Failed to create patient");
+      setError(err.response?.data?.message || "Unable to save patient.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // --------------------------------
+  // View Patient
+  // --------------------------------
+  const handleView = async (patient) => {
+    try {
+      setLoading(true);
+
+      const response = await api.get(`/patients/${patient._id}`);
+
+      setSelectedPatient(response.data);
+      setViewOpened(true);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.response?.data?.message || "Unable to load patient details.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --------------------------------
+  // Open delete confirmation
+  // --------------------------------
+  const handleDeleteClick = (id) => {
+    setDeletePatientId(id);
+    setDeleteOpened(true);
+  };
+
+  // --------------------------------
+  // Deactivate patient
+  // --------------------------------
+  const handleDelete = async () => {
+    if (!deletePatientId) return;
+
+    try {
+      setLoading(true);
+
+      await api.delete(`/patients/${deletePatientId}`);
+
+      setDeleteOpened(false);
+      setDeletePatientId(null);
+
+      await fetchPatients();
+    } catch (err) {
+      console.error(err);
+
+      setError(err.response?.data?.message || "Unable to deactivate patient.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --------------------------------
+  // Search
+  // --------------------------------
   const filteredPatients = patients.filter((patient) => {
-    const searchText = search.toLowerCase();
+    const value = search.toLowerCase();
 
     return (
-      patient.name?.toLowerCase().includes(searchText) ||
-      patient.patientId?.toLowerCase().includes(searchText) ||
-      patient.phone?.toLowerCase().includes(searchText)
+      patient.name?.toLowerCase().includes(value) ||
+      patient.patientId?.toLowerCase().includes(value) ||
+      patient.phone?.toLowerCase().includes(value)
     );
   });
 
   return (
-    <Container size="xl">
+    <Stack gap="lg">
       {/* Header */}
-
-      <Group justify="space-between" mb="xl">
+      <Group justify="space-between">
         <div>
           <Title order={2}>Patients</Title>
 
-          <Text c="dimmed">Manage clinic patients</Text>
+          <Text c="dimmed" size="sm">
+            Manage patient records and medical information
+          </Text>
         </div>
 
-        <Button
-          leftSection={<IconPlus size={18} />}
-          onClick={() => {
-            resetForm();
-            setOpened(true);
-          }}
-        >
+        <Button leftSection={<IconPlus size={18} />} onClick={handleAdd}>
           Add Patient
         </Button>
       </Group>
 
-      {/* Search */}
+      {/* Error */}
+      {error && (
+        <Alert
+          icon={<IconAlertCircle size={18} />}
+          color="red"
+          withCloseButton
+          onClose={() => setError("")}
+        >
+          {error}
+        </Alert>
+      )}
 
-      <Paper withBorder p="md" mb="md">
+      {/* Search */}
+      <Paper withBorder p="md">
         <TextInput
           placeholder="Search by name, patient ID or phone..."
           leftSection={<IconSearch size={18} />}
@@ -184,27 +332,19 @@ function Patients() {
         />
       </Paper>
 
-      {/* Patient Table */}
-
-      <Paper withBorder radius="md" p="md">
-        <Table.ScrollContainer minWidth={1000}>
-          <Table striped highlightOnHover>
+      {/* Patient table */}
+      <Paper withBorder>
+        <ScrollArea>
+          <Table striped highlightOnHover verticalSpacing="md" miw={900}>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Patient ID</Table.Th>
-
-                <Table.Th>Patient</Table.Th>
-
-                <Table.Th>Gender</Table.Th>
-
+                <Table.Th>Name</Table.Th>
                 <Table.Th>Age</Table.Th>
-
+                <Table.Th>Gender</Table.Th>
                 <Table.Th>Blood Group</Table.Th>
-
                 <Table.Th>Phone</Table.Th>
-
                 <Table.Th>Status</Table.Th>
-
                 <Table.Th>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -214,7 +354,7 @@ function Patients() {
                 <Table.Tr>
                   <Table.Td colSpan={8}>
                     <Text ta="center" c="dimmed" py="xl">
-                      No patients found
+                      {loading ? "Loading patients..." : "No patients found."}
                     </Text>
                   </Table.Td>
                 </Table.Tr>
@@ -225,35 +365,46 @@ function Patients() {
                       <Text fw={600}>{patient.patientId}</Text>
                     </Table.Td>
 
-                    <Table.Td>
-                      <Text fw={500}>{patient.name}</Text>
-
-                      <Text size="xs" c="dimmed">
-                        {patient.email || "No email"}
-                      </Text>
-                    </Table.Td>
-
-                    <Table.Td>{patient.gender}</Table.Td>
+                    <Table.Td>{patient.name}</Table.Td>
 
                     <Table.Td>{patient.age ?? "-"}</Table.Td>
 
-                    <Table.Td>
-                      <Badge variant="light">{patient.bloodGroup}</Badge>
-                    </Table.Td>
+                    <Table.Td>{patient.gender}</Table.Td>
+
+                    <Table.Td>{patient.bloodGroup}</Table.Td>
 
                     <Table.Td>{patient.phone}</Table.Td>
 
                     <Table.Td>
-                      <Badge color="green">{patient.status}</Badge>
+                      <Badge color="green">Active</Badge>
                     </Table.Td>
 
                     <Table.Td>
                       <Group gap="xs">
-                        <ActionIcon variant="light">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          onClick={() => handleView(patient)}
+                          title="View patient"
+                        >
+                          <IconEye size={17} />
+                        </ActionIcon>
+
+                        <ActionIcon
+                          variant="light"
+                          color="yellow"
+                          onClick={() => handleEdit(patient)}
+                          title="Edit patient"
+                        >
                           <IconEdit size={17} />
                         </ActionIcon>
 
-                        <ActionIcon color="red" variant="light">
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          onClick={() => handleDeleteClick(patient._id)}
+                          title="Deactivate patient"
+                        >
                           <IconTrash size={17} />
                         </ActionIcon>
                       </Group>
@@ -263,50 +414,55 @@ function Patients() {
               )}
             </Table.Tbody>
           </Table>
-        </Table.ScrollContainer>
+        </ScrollArea>
       </Paper>
 
-      {/* Add Patient Modal */}
-
+      {/* =========================================
+          ADD / EDIT PATIENT MODAL
+      ========================================= */}
       <Modal
         opened={opened}
         onClose={() => {
           setOpened(false);
           resetForm();
         }}
-        title="Register New Patient"
-        size="lg"
+        title={
+          <Text fw={700} size="lg">
+            {editingPatient ? "Edit Patient" : "Add New Patient"}
+          </Text>
+        }
+        size="xl"
       >
         <Stack>
-          {/* Personal Information */}
+          {error && (
+            <Alert color="red" icon={<IconAlertCircle size={18} />}>
+              {error}
+            </Alert>
+          )}
 
-          <Title order={4}>Personal Information</Title>
+          <Text fw={600}>Basic Information</Text>
 
-          <SimpleGrid cols={2}>
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <TextInput
               label="Full Name"
-              placeholder="Rahul Kumar"
+              placeholder="Enter patient name"
               required
               value={form.name}
-              onChange={(event) =>
-                handleChange("name", event.currentTarget.value)
-              }
+              onChange={(e) => handleChange("name", e.currentTarget.value)}
             />
 
             <TextInput
               label="Date of Birth"
               type="date"
               value={form.dateOfBirth}
-              onChange={(event) =>
-                handleChange("dateOfBirth", event.currentTarget.value)
+              onChange={(e) =>
+                handleChange("dateOfBirth", e.currentTarget.value)
               }
             />
-          </SimpleGrid>
 
-          <SimpleGrid cols={2}>
             <NumberInput
               label="Age"
-              placeholder="28"
+              placeholder="Age"
               min={0}
               max={150}
               value={form.age}
@@ -319,41 +475,42 @@ function Patients() {
               required
               data={["Male", "Female", "Other"]}
               value={form.gender}
-              onChange={(value) => handleChange("gender", value)}
+              onChange={(value) => handleChange("gender", value || "")}
             />
-          </SimpleGrid>
 
-          <Select
-            label="Blood Group"
-            data={["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"]}
-            value={form.bloodGroup}
-            onChange={(value) => handleChange("bloodGroup", value)}
-          />
+            <Select
+              label="Blood Group"
+              placeholder="Select blood group"
+              required
+              data={[
+                "A+",
+                "A-",
+                "B+",
+                "B-",
+                "AB+",
+                "AB-",
+                "O+",
+                "O-",
+                "Unknown",
+              ]}
+              value={form.bloodGroup}
+              onChange={(value) => handleChange("bloodGroup", value || "")}
+            />
 
-          {/* Contact Information */}
-
-          <Title order={4} mt="md">
-            Contact Information
-          </Title>
-
-          <SimpleGrid cols={2}>
             <TextInput
               label="Phone"
-              placeholder="9876543210"
+              placeholder="Phone number"
               required
               value={form.phone}
-              onChange={(event) =>
-                handleChange("phone", event.currentTarget.value)
-              }
+              onChange={(e) => handleChange("phone", e.currentTarget.value)}
             />
 
             <TextInput
               label="Email"
               placeholder="patient@example.com"
+              type="email"
               value={form.email}
-              onChange={(event) =>
-                handleChange("email", event.currentTarget.value)
-              }
+              onChange={(e) => handleChange("email", e.currentTarget.value)}
             />
           </SimpleGrid>
 
@@ -362,73 +519,63 @@ function Patients() {
             placeholder="Patient address"
             minRows={2}
             value={form.address}
-            onChange={(event) =>
-              handleChange("address", event.currentTarget.value)
-            }
+            onChange={(e) => handleChange("address", e.currentTarget.value)}
           />
 
-          {/* Emergency Contact */}
-
-          <Title order={4} mt="md">
+          <Text fw={600} mt="md">
             Emergency Contact
-          </Title>
+          </Text>
 
-          <SimpleGrid cols={2}>
+          <SimpleGrid cols={{ base: 1, sm: 3 }}>
             <TextInput
-              label="Contact Name"
-              placeholder="Priya Kumar"
+              label="Name"
+              placeholder="Emergency contact name"
               value={form.emergencyName}
-              onChange={(event) =>
-                handleChange("emergencyName", event.currentTarget.value)
+              onChange={(e) =>
+                handleChange("emergencyName", e.currentTarget.value)
               }
             />
 
             <TextInput
               label="Relationship"
-              placeholder="Wife"
+              placeholder="Father, Mother, Spouse..."
               value={form.emergencyRelationship}
-              onChange={(event) =>
-                handleChange("emergencyRelationship", event.currentTarget.value)
+              onChange={(e) =>
+                handleChange("emergencyRelationship", e.currentTarget.value)
+              }
+            />
+
+            <TextInput
+              label="Phone"
+              placeholder="Emergency phone"
+              value={form.emergencyPhone}
+              onChange={(e) =>
+                handleChange("emergencyPhone", e.currentTarget.value)
               }
             />
           </SimpleGrid>
 
-          <TextInput
-            label="Emergency Phone"
-            placeholder="9876500000"
-            value={form.emergencyPhone}
-            onChange={(event) =>
-              handleChange("emergencyPhone", event.currentTarget.value)
-            }
-          />
-
-          {/* Medical Information */}
-
-          <Title order={4} mt="md">
+          <Text fw={600} mt="md">
             Medical Information
-          </Title>
+          </Text>
 
           <Textarea
             label="Allergies"
-            placeholder="Example: Penicillin"
-            minRows={2}
+            placeholder="Known allergies"
+            minRows={3}
             value={form.allergies}
-            onChange={(event) =>
-              handleChange("allergies", event.currentTarget.value)
-            }
+            onChange={(e) => handleChange("allergies", e.currentTarget.value)}
           />
 
           <Textarea
             label="Medical History"
             placeholder="Previous illnesses, surgeries, conditions..."
-            minRows={3}
+            minRows={4}
             value={form.medicalHistory}
-            onChange={(event) =>
-              handleChange("medicalHistory", event.currentTarget.value)
+            onChange={(e) =>
+              handleChange("medicalHistory", e.currentTarget.value)
             }
           />
-
-          {/* Buttons */}
 
           <Group justify="flex-end" mt="md">
             <Button
@@ -441,11 +588,165 @@ function Patients() {
               Cancel
             </Button>
 
-            <Button onClick={handleSubmit}>Register Patient</Button>
+            <Button loading={loading} onClick={handleSubmit}>
+              {editingPatient ? "Update Patient" : "Add Patient"}
+            </Button>
           </Group>
         </Stack>
       </Modal>
-    </Container>
+
+      {/* =========================================
+          VIEW PATIENT MODAL
+      ========================================= */}
+      <Modal
+        opened={viewOpened}
+        onClose={() => {
+          setViewOpened(false);
+          setSelectedPatient(null);
+        }}
+        title="Patient Details"
+        size="xl"
+      >
+        {selectedPatient && (
+          <Stack>
+            <Group justify="space-between">
+              <div>
+                <Text size="xl" fw={700}>
+                  {selectedPatient.name}
+                </Text>
+
+                <Text c="dimmed">{selectedPatient.patientId}</Text>
+              </div>
+
+              <Badge color="green" size="lg">
+                {selectedPatient.status}
+              </Badge>
+            </Group>
+
+            <SimpleGrid cols={{ base: 1, sm: 2 }}>
+              <Paper withBorder p="md">
+                <Text size="sm" c="dimmed">
+                  Age
+                </Text>
+                <Text fw={600}>{selectedPatient.age ?? "-"}</Text>
+              </Paper>
+
+              <Paper withBorder p="md">
+                <Text size="sm" c="dimmed">
+                  Gender
+                </Text>
+                <Text fw={600}>{selectedPatient.gender}</Text>
+              </Paper>
+
+              <Paper withBorder p="md">
+                <Text size="sm" c="dimmed">
+                  Blood Group
+                </Text>
+                <Text fw={600}>{selectedPatient.bloodGroup}</Text>
+              </Paper>
+
+              <Paper withBorder p="md">
+                <Text size="sm" c="dimmed">
+                  Phone
+                </Text>
+                <Text fw={600}>{selectedPatient.phone}</Text>
+              </Paper>
+
+              <Paper withBorder p="md">
+                <Text size="sm" c="dimmed">
+                  Email
+                </Text>
+                <Text fw={600}>{selectedPatient.email || "-"}</Text>
+              </Paper>
+
+              <Paper withBorder p="md">
+                <Text size="sm" c="dimmed">
+                  Date of Birth
+                </Text>
+                <Text fw={600}>
+                  {selectedPatient.dateOfBirth
+                    ? selectedPatient.dateOfBirth.slice(0, 10)
+                    : "-"}
+                </Text>
+              </Paper>
+            </SimpleGrid>
+
+            <Paper withBorder p="md">
+              <Text fw={600} mb="xs">
+                Address
+              </Text>
+
+              <Text>{selectedPatient.address || "-"}</Text>
+            </Paper>
+
+            <Paper withBorder p="md">
+              <Text fw={600} mb="xs">
+                Emergency Contact
+              </Text>
+
+              <Text>Name: {selectedPatient.emergencyContact?.name || "-"}</Text>
+
+              <Text>
+                Relationship:{" "}
+                {selectedPatient.emergencyContact?.relationship || "-"}
+              </Text>
+
+              <Text>
+                Phone: {selectedPatient.emergencyContact?.phone || "-"}
+              </Text>
+            </Paper>
+
+            <Paper withBorder p="md">
+              <Text fw={600} mb="xs">
+                Allergies
+              </Text>
+
+              <Text>{selectedPatient.allergies || "None recorded"}</Text>
+            </Paper>
+
+            <Paper withBorder p="md">
+              <Text fw={600} mb="xs">
+                Medical History
+              </Text>
+
+              <Text>
+                {selectedPatient.medicalHistory ||
+                  "No medical history recorded"}
+              </Text>
+            </Paper>
+          </Stack>
+        )}
+      </Modal>
+
+      {/* =========================================
+          DEACTIVATE CONFIRMATION
+      ========================================= */}
+      <Modal
+        opened={deleteOpened}
+        onClose={() => setDeleteOpened(false)}
+        title="Deactivate Patient"
+        centered
+      >
+        <Stack>
+          <Text>Are you sure you want to deactivate this patient?</Text>
+
+          <Text size="sm" c="dimmed">
+            The patient will no longer appear in the active patient list, but
+            their historical medical records will remain in the database.
+          </Text>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleteOpened(false)}>
+              Cancel
+            </Button>
+
+            <Button color="red" loading={loading} onClick={handleDelete}>
+              Deactivate
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </Stack>
   );
 }
 
