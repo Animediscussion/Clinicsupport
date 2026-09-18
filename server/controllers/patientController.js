@@ -1,21 +1,22 @@
 import Patient from "../models/Patient.js";
 
+// Get all active patients
 export const getPatients = async (req, res) => {
   try {
-    const patients = await Patient.find().sort({
-      createdAt: -1,
-    });
+    const patients = await Patient.find({
+      status: "active",
+    }).sort({ createdAt: -1 });
 
     res.json(patients);
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch patients",
-      error: error.message,
     });
   }
 };
 
-export const getPatient = async (req, res) => {
+// Get single patient
+export const getPatientById = async (req, res) => {
   try {
     const patient = await Patient.findById(req.params.id);
 
@@ -29,30 +30,48 @@ export const getPatient = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch patient",
-      error: error.message,
     });
   }
 };
 
+// Generate patient ID
+const generatePatientId = async () => {
+  const count = await Patient.countDocuments();
+
+  return `PAT-${String(count + 1).padStart(6, "0")}`;
+};
+
+// Create patient
 export const createPatient = async (req, res) => {
   try {
-    const patient = await Patient.create(req.body);
+    const patientId = await generatePatientId();
+
+    const patient = await Patient.create({
+      ...req.body,
+      patientId,
+    });
 
     res.status(201).json(patient);
   } catch (error) {
-    res.status(400).json({
+    console.error(error);
+
+    res.status(500).json({
       message: "Failed to create patient",
-      error: error.message,
     });
   }
 };
 
+// Update patient
 export const updatePatient = async (req, res) => {
   try {
-    const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const patient = await Patient.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     if (!patient) {
       return res.status(404).json({
@@ -62,16 +81,26 @@ export const updatePatient = async (req, res) => {
 
     res.json(patient);
   } catch (error) {
-    res.status(400).json({
+    console.error(error);
+
+    res.status(500).json({
       message: "Failed to update patient",
-      error: error.message,
     });
   }
 };
 
+// Deactivate patient
 export const deletePatient = async (req, res) => {
   try {
-    const patient = await Patient.findByIdAndDelete(req.params.id);
+    const patient = await Patient.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: "inactive",
+      },
+      {
+        new: true,
+      }
+    );
 
     if (!patient) {
       return res.status(404).json({
@@ -80,12 +109,13 @@ export const deletePatient = async (req, res) => {
     }
 
     res.json({
-      message: "Patient deleted successfully",
+      message: "Patient deactivated successfully",
     });
   } catch (error) {
+    console.error(error);
+
     res.status(500).json({
-      message: "Failed to delete patient",
-      error: error.message,
+      message: "Failed to deactivate patient",
     });
   }
 };
