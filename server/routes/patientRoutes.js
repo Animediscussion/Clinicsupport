@@ -2,24 +2,24 @@ import express from "express";
 
 import {
   getPatients,
-  getPatient,
+  getPatientById,
   createPatient,
   updatePatient,
   deletePatient,
 } from "../controllers/patientController.js";
 
-import { protect, authorize } from "../middleware/auth.js";
+import { auth, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.get("/", protect, getPatients);
+router.get("/", auth, getPatients);
 
-router.get("/:id", protect, getPatient);
+router.get("/:id", auth, getPatientById);
 
-router.post("/", protect, authorize("admin"), createPatient);
+router.post("/", auth, authorize("admin", "receptionist"), createPatient);
 
-router.put("/:id", protect, authorize("admin"), updatePatient);
+router.put("/:id", auth, authorize("admin", "receptionist"), updatePatient);
 
-router.delete("/:id", protect, authorize("admin"), deletePatient);
+router.delete("/:id", auth, authorize("admin"), deletePatient);
 
 export default router;
