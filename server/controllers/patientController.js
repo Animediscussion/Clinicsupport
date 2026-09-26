@@ -1,6 +1,9 @@
 import Patient from "../models/Patient.js";
+import Counter from "../models/Counter.js";
 
+// ==========================================
 // Get all active patients
+// ==========================================
 export const getPatients = async (req, res) => {
   try {
     const patients = await Patient.find({
@@ -9,13 +12,17 @@ export const getPatients = async (req, res) => {
 
     res.json(patients);
   } catch (error) {
+    console.error("Get patients error:", error);
+
     res.status(500).json({
       message: "Failed to fetch patients",
     });
   }
 };
 
+// ==========================================
 // Get single patient
+// ==========================================
 export const getPatientById = async (req, res) => {
   try {
     const patient = await Patient.findById(req.params.id);
@@ -28,20 +35,39 @@ export const getPatientById = async (req, res) => {
 
     res.json(patient);
   } catch (error) {
+    console.error("Get patient error:", error);
+
     res.status(500).json({
       message: "Failed to fetch patient",
     });
   }
 };
 
-// Generate patient ID
+// ==========================================
+// Generate unique Patient ID
+// ==========================================
 const generatePatientId = async () => {
-  const count = await Patient.countDocuments();
+  const counter = await Counter.findOneAndUpdate(
+    {
+      name: "patient",
+    },
+    {
+      $inc: {
+        sequence: 1,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+    },
+  );
 
-  return `PAT-${String(count + 1).padStart(6, "0")}`;
+  return `PAT-${String(counter.sequence).padStart(6, "0")}`;
 };
 
+// ==========================================
 // Create patient
+// ==========================================
 export const createPatient = async (req, res) => {
   try {
     const patientId = await generatePatientId();
@@ -53,7 +79,7 @@ export const createPatient = async (req, res) => {
 
     res.status(201).json(patient);
   } catch (error) {
-    console.error(error);
+    console.error("Create patient error:", error);
 
     res.status(500).json({
       message: "Failed to create patient",
@@ -61,17 +87,15 @@ export const createPatient = async (req, res) => {
   }
 };
 
+// ==========================================
 // Update patient
+// ==========================================
 export const updatePatient = async (req, res) => {
   try {
-    const patient = await Patient.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!patient) {
       return res.status(404).json({
@@ -81,7 +105,7 @@ export const updatePatient = async (req, res) => {
 
     res.json(patient);
   } catch (error) {
-    console.error(error);
+    console.error("Update patient error:", error);
 
     res.status(500).json({
       message: "Failed to update patient",
@@ -89,7 +113,9 @@ export const updatePatient = async (req, res) => {
   }
 };
 
+// ==========================================
 // Deactivate patient
+// ==========================================
 export const deletePatient = async (req, res) => {
   try {
     const patient = await Patient.findByIdAndUpdate(
@@ -99,7 +125,7 @@ export const deletePatient = async (req, res) => {
       },
       {
         new: true,
-      }
+      },
     );
 
     if (!patient) {
@@ -112,7 +138,7 @@ export const deletePatient = async (req, res) => {
       message: "Patient deactivated successfully",
     });
   } catch (error) {
-    console.error(error);
+    console.error("Deactivate patient error:", error);
 
     res.status(500).json({
       message: "Failed to deactivate patient",
