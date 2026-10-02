@@ -6,6 +6,7 @@ import {
   createAppointment,
   updateAppointment,
   cancelAppointment,
+  getAvailableSlots,
 } from "../controllers/appointmentController.js";
 
 import { protect, authorize } from "../middleware/auth.js";
@@ -22,6 +23,8 @@ router.get("/", protect, getAppointments);
 // Get single appointment
 // ==========================================
 router.get("/:id", protect, getAppointmentById);
+
+router.get("/availability", protect, getAvailableSlots);
 
 // ==========================================
 // Create appointment
