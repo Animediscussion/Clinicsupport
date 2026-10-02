@@ -275,3 +275,159 @@ export const cancelAppointment = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// Time helper: HH:mm -> minutes
+// ==========================================
+const timeToMinutes = (time) => {
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return hours * 60 + minutes;
+};
+
+// ==========================================
+// Get available appointment slots
+// ==========================================
+export const getAvailableSlots = async (req, res) => {
+  try {
+    const { doctorId, date } = req.query;
+
+    // -------------------------------
+    // Validate required fields
+    // -------------------------------
+    if (!doctorId || !date) {
+      return res.status(400).json({
+        message: "Doctor ID and date are required.",
+      });
+    }
+
+    // -------------------------------
+    // Validate date format
+    // -------------------------------
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        message: "Invalid date format. Use YYYY-MM-DD.",
+      });
+    }
+
+    // -------------------------------
+    // Validate actual calendar date
+    // -------------------------------
+    const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+    if (
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.toISOString().slice(0, 10) !== date
+    ) {
+      return res.status(400).json({
+        message: "Invalid calendar date.",
+      });
+    }
+
+    // -------------------------------
+    // Find active doctor
+    // -------------------------------
+    const doctor = await Doctor.findOne({
+      _id: doctorId,
+      status: "active",
+    });
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: "Doctor not found or inactive.",
+      });
+    }
+
+    // -------------------------------
+    // Get selected weekday
+    // -------------------------------
+    const weekdays = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
+
+    const selectedDay = weekdays[parsedDate.getUTCDay()];
+
+    // -------------------------------
+    // Check doctor's working day
+    // -------------------------------
+    if (!doctor.availability?.days?.includes(selectedDay)) {
+      return res.json({
+        date,
+        doctorId,
+        availableSlots: [],
+        message: "Doctor is not available on this day.",
+      });
+    }
+
+    // -------------------------------
+    // Get doctor's working hours
+    // -------------------------------
+    const startTime = doctor.availability.startTime;
+    const endTime = doctor.availability.endTime;
+
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+
+    if (
+      !Number.isFinite(startMinutes) ||
+      !Number.isFinite(endMinutes) ||
+      startMinutes >= endMinutes
+    ) {
+      return res.status(400).json({
+        message: "Doctor availability is configured incorrectly.",
+      });
+    }
+
+    // -------------------------------
+    // Get booked appointments
+    // -------------------------------
+    const bookedAppointments = await Appointment.find({
+      doctor: doctorId,
+      appointmentDate: date,
+      status: {
+        $in: ["scheduled", "completed", "no-show"],
+      },
+    }).select("appointmentTime");
+
+    const bookedTimes = new Set(
+      bookedAppointments.map((appointment) => appointment.appointmentTime),
+    );
+
+    // -------------------------------
+    // Generate 30-minute slots
+    // -------------------------------
+    const availableSlots = [];
+
+    for (let time = startMinutes; time + 30 <= endMinutes; time += 30) {
+      const hours = String(Math.floor(time / 60)).padStart(2, "0");
+      const minutes = String(time % 60).padStart(2, "0");
+
+      const slot = `${hours}:${minutes}`;
+
+      if (!bookedTimes.has(slot)) {
+        availableSlots.push(slot);
+      }
+    }
+
+    // -------------------------------
+    // Return available slots
+    // -------------------------------
+    res.json({
+      doctorId,
+      date,
+      availableSlots,
+    });
+  } catch (error) {
+    console.error("Get available slots error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch available slots.",
+    });
+  }
+};
