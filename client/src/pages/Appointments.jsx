@@ -2,255 +2,273 @@ import { useEffect, useState } from "react";
 
 import {
   Alert,
-  Badge,
   Button,
   Card,
   Group,
   Loader,
-  Modal,
   Paper,
   Select,
+  SimpleGrid,
   Stack,
-  Table,
   Text,
+  TextInput,
+  Textarea,
   Title,
 } from "@mantine/core";
 
-import {
-  IconAlertCircle,
-  IconCalendarPlus,
-  IconRefresh,
-} from "@tabler/icons-react";
-
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/Navbar";
-import AppointmentForm from "../components/AppointmentForm";
+import { DatePickerInput } from "@mantine/dates";
 
 import api from "../services/api";
 
 function Appointments() {
-  const [appointments, setAppointments] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [doctors, setDoctors] = useState([]);
 
-  const [loading, setLoading] = useState(true);
+  const [patient, setPatient] = useState(null);
+  const [doctor, setDoctor] = useState(null);
+  const [date, setDate] = useState(null);
+  const [time, setTime] = useState(null);
+
+  const [reason, setReason] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const [showForm, setShowForm] = useState(false);
-
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const fetchAppointments = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await api.get("/appointments");
-
-      setAppointments(response.data);
-    } catch (error) {
-      console.error("Failed to fetch appointments:", error);
-
-      setError(error.response?.data?.message || "Failed to load appointments.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch patients and doctors
   useEffect(() => {
-    fetchAppointments();
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        const [patientResponse, doctorResponse] = await Promise.all([
+          api.get("/patients"),
+          api.get("/doctors"),
+        ]);
+
+        setPatients(patientResponse.data);
+        setDoctors(doctorResponse.data);
+      } catch (err) {
+        setError("Failed to load patients or doctors.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Scheduled":
-        return "blue";
+  // Convert Date to YYYY-MM-DD using local calendar date
+  const formatDate = (value) => {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
 
-      case "Completed":
-        return "green";
-
-      case "Cancelled":
-        return "red";
-
-      case "Pending":
-        return "yellow";
-
-      default:
-        return "gray";
-    }
+    return `${year}-${month}-${day}`;
   };
 
-  const formatDate = (date) => {
-    if (!date) {
-      return "-";
+  // Fetch available slots whenever doctor or date changes
+  useEffect(() => {
+    if (!doctor || !date) {
+      setSlots([]);
+      setTime(null);
+      return;
     }
 
-    return new Date(date).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    let cancelled = false;
+
+    const fetchSlots = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        setTime(null);
+
+        const response = await api.get("/appointments/availability", {
+          params: {
+            doctorId: doctor,
+            date: formatDate(date),
+          },
+        });
+
+        if (!cancelled) {
+          setSlots(response.data.availableSlots);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSlots([]);
+          setError(
+            err.response?.data?.message || "Failed to load available slots.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSlots();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [doctor, date]);
+
+  // Book appointment
+  const handleBooking = async () => {
+    if (!patient || !doctor || !date || !time) {
+      setError("Please select patient, doctor, date and time.");
+      return;
+    }
+
+    try {
+      setBooking(true);
+      setError("");
+      setSuccess("");
+
+      await api.post("/appointments", {
+        patient,
+        doctor,
+        appointmentDate: formatDate(date),
+        appointmentTime: time,
+        reason,
+        notes,
+      });
+
+      setSuccess("Appointment booked successfully!");
+
+      // Clear booking form
+      setPatient(null);
+      setDoctor(null);
+      setDate(null);
+      setTime(null);
+      setReason("");
+      setNotes("");
+      setSlots([]);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to book appointment.");
+    } finally {
+      setBooking(false);
+    }
   };
-
-  const filteredAppointments =
-    statusFilter === "all"
-      ? appointments
-      : appointments.filter(
-          (appointment) => appointment.status === statusFilter,
-        );
-
-  const rows = filteredAppointments.map((appointment) => (
-    <Table.Tr key={appointment._id}>
-      <Table.Td>
-        <Text fw={500}>{appointment.patient?.name || "Unknown Patient"}</Text>
-      </Table.Td>
-
-      <Table.Td>{appointment.doctor?.name || "Unknown Doctor"}</Table.Td>
-
-      <Table.Td>{formatDate(appointment.date)}</Table.Td>
-
-      <Table.Td>{appointment.time || "-"}</Table.Td>
-
-      <Table.Td>{appointment.reason || "-"}</Table.Td>
-
-      <Table.Td>
-        <Badge color={getStatusColor(appointment.status)} variant="light">
-          {appointment.status || "Pending"}
-        </Badge>
-      </Table.Td>
-    </Table.Tr>
-  ));
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <Sidebar />
+    <Stack gap="lg">
+      <div>
+        <Title order={2}>Book Appointment</Title>
 
-      <main style={{ flex: 1 }}>
-        <Navbar />
+        <Text c="dimmed" size="sm">
+          Schedule a new patient appointment.
+        </Text>
+      </div>
 
-        <div style={{ padding: "24px" }}>
-          <Group justify="space-between" mb="xl">
-            <div>
-              <Title order={2}>Appointments</Title>
+      {error && (
+        <Alert color="red" withCloseButton onClose={() => setError("")}>
+          {error}
+        </Alert>
+      )}
 
-              <Text c="dimmed" size="sm">
-                Manage patient appointments
-              </Text>
-            </div>
+      {success && (
+        <Alert color="green" withCloseButton onClose={() => setSuccess("")}>
+          {success}
+        </Alert>
+      )}
 
-            <Group>
-              <Button
-                variant="light"
-                leftSection={<IconRefresh size={18} />}
-                onClick={fetchAppointments}
-              >
-                Refresh
-              </Button>
+      <Paper withBorder p="lg" radius="md">
+        <Stack>
+          <Title order={4}>Appointment Information</Title>
 
-              <Button
-                leftSection={<IconCalendarPlus size={18} />}
-                onClick={() => setShowForm(true)}
-              >
-                New Appointment
-              </Button>
-            </Group>
-          </Group>
+          <Select
+            label="Select Patient"
+            placeholder="Choose a patient"
+            searchable
+            data={patients.map((item) => ({
+              value: item._id,
+              label: `${item.patientId} - ${item.name}`,
+            }))}
+            value={patient}
+            onChange={setPatient}
+          />
 
-          {error && (
-            <Alert color="red" icon={<IconAlertCircle size={18} />} mb="md">
-              {error}
-            </Alert>
+          <Select
+            label="Select Doctor"
+            placeholder="Choose a doctor"
+            searchable
+            data={doctors
+              .filter((item) => item.status === "active")
+              .map((item) => ({
+                value: item._id,
+                label: `${item.name} - ${item.specialization}`,
+              }))}
+            value={doctor}
+            onChange={setDoctor}
+          />
+
+          <DatePickerInput
+            label="Appointment Date"
+            placeholder="Select appointment date"
+            minDate={new Date()}
+            value={date}
+            onChange={setDate}
+            clearable
+          />
+
+          {doctor && date && (
+            <Stack gap="sm">
+              <Group justify="space-between">
+                <Text fw={600}>Available Time Slots</Text>
+
+                {loading && <Loader size="xs" />}
+              </Group>
+
+              {slots.length === 0 && !loading ? (
+                <Text size="sm" c="dimmed">
+                  No available slots for this date.
+                </Text>
+              ) : (
+                <SimpleGrid cols={{ base: 3, sm: 4, md: 6 }}>
+                  {slots.map((slot) => (
+                    <Button
+                      key={slot}
+                      variant={time === slot ? "filled" : "light"}
+                      onClick={() => setTime(slot)}
+                    >
+                      {slot}
+                    </Button>
+                  ))}
+                </SimpleGrid>
+              )}
+            </Stack>
           )}
 
-          <Card withBorder shadow="sm" radius="md">
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Appointment List</Title>
+          <Textarea
+            label="Reason for Visit"
+            placeholder="Describe the patient's symptoms or reason for consultation"
+            value={reason}
+            onChange={(event) => setReason(event.currentTarget.value)}
+          />
 
-              <Select
-                placeholder="Filter by status"
-                value={statusFilter}
-                onChange={(value) => setStatusFilter(value || "all")}
-                data={[
-                  {
-                    value: "all",
-                    label: "All",
-                  },
-                  {
-                    value: "Scheduled",
-                    label: "Scheduled",
-                  },
-                  {
-                    value: "Pending",
-                    label: "Pending",
-                  },
-                  {
-                    value: "Completed",
-                    label: "Completed",
-                  },
-                  {
-                    value: "Cancelled",
-                    label: "Cancelled",
-                  },
-                ]}
-                w={180}
-              />
-            </Group>
+          <Textarea
+            label="Additional Notes"
+            placeholder="Optional notes"
+            value={notes}
+            onChange={(event) => setNotes(event.currentTarget.value)}
+          />
 
-            {loading ? (
-              <Stack align="center" justify="center" p="xl">
-                <Loader />
-
-                <Text c="dimmed">Loading appointments...</Text>
-              </Stack>
-            ) : filteredAppointments.length === 0 ? (
-              <Paper withBorder p="xl" ta="center">
-                <Text c="dimmed">No appointments found.</Text>
-
-                <Button mt="md" onClick={() => setShowForm(true)}>
-                  Schedule First Appointment
-                </Button>
-              </Paper>
-            ) : (
-              <Table.ScrollContainer minWidth={800}>
-                <Table striped highlightOnHover withTableBorder>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Patient</Table.Th>
-
-                      <Table.Th>Doctor</Table.Th>
-
-                      <Table.Th>Date</Table.Th>
-
-                      <Table.Th>Time</Table.Th>
-
-                      <Table.Th>Reason</Table.Th>
-
-                      <Table.Th>Status</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-
-                  <Table.Tbody>{rows}</Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
-            )}
-          </Card>
-        </div>
-      </main>
-
-      <Modal
-        opened={showForm}
-        onClose={() => setShowForm(false)}
-        title="Schedule Appointment"
-        size="lg"
-        centered
-      >
-        <AppointmentForm
-          onSuccess={() => {
-            setShowForm(false);
-            fetchAppointments();
-          }}
-          onCancel={() => setShowForm(false)}
-        />
-      </Modal>
-    </div>
+          <Button
+            fullWidth
+            loading={booking}
+            disabled={!patient || !doctor || !date || !time}
+            onClick={handleBooking}
+          >
+            Book Appointment
+          </Button>
+        </Stack>
+      </Paper>
+    </Stack>
   );
 }
 
