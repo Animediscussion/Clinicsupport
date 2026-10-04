@@ -6,6 +6,7 @@ import Patients from "./pages/Patients";
 import Doctors from "./pages/Doctors";
 import Appointments from "./pages/Appointments";
 import Billing from "./pages/Billing";
+import AppointmentList from "./pages/AppointmentList";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 
@@ -56,6 +57,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Billing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/appointments/list"
+          element={
+            <ProtectedRoute>
+              <AppointmentList />
             </ProtectedRoute>
           }
         />
