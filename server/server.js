@@ -22,6 +22,7 @@ app.use("/api/doctors", doctorRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/appointments", appointmentRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // Test route
 app.get("/", (req, res) => {
