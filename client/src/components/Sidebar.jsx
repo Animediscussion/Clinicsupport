@@ -5,9 +5,10 @@ import {
   IconCalendar,
   IconFileInvoice,
   IconLogout,
+  IconPrescription,
 } from "@tabler/icons-react";
 
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, Link } from "react-router-dom";
 
 import { Stack, Text, Button, Divider } from "@mantine/core";
 
@@ -36,6 +37,11 @@ const links = [
     label: "Billing",
     path: "/billing",
     icon: IconFileInvoice,
+  },
+  {
+    label: "Prescriptions",
+    path: "/prescriptions",
+    icon: IconPrescription,
   },
 ];
 
