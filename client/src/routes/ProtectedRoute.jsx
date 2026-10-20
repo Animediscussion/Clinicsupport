@@ -1,4 +1,4 @@
-/* import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -10,9 +10,9 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-export default ProtectedRoute; */
+export default ProtectedRoute;
 
-import { Navigate } from "react-router-dom";
+/* import { Navigate } from "react-router-dom";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -28,3 +28,4 @@ function ProtectedRoute({ children }) {
 }
 
 export default ProtectedRoute;
+ */
