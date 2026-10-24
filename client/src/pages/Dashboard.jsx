@@ -1,41 +1,143 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import {
-  Card,
-  SimpleGrid,
-  Text,
-  Title,
-  Group,
+  ActionIcon,
+  Alert,
+  Avatar,
   Badge,
-  Table,
-  Loader,
+  Box,
+  Card,
   Center,
+  Container,
+  Group,
+  SimpleGrid,
+  Skeleton,
   Stack,
+  Table,
+  Text,
+  ThemeIcon,
+  Title,
+  Tooltip,
 } from "@mantine/core";
-
 import {
   IconUsers,
   IconStethoscope,
   IconCalendar,
   IconCircleCheck,
   IconCircleX,
+  IconRefresh,
+  IconAlertCircle,
+  IconClock,
+  IconPhone,
+  IconUser,
 } from "@tabler/icons-react";
 
 const API = axios.create({
   baseURL: "http://localhost:5000/api",
 });
 
+const formatDate = (value) => {
+  if (!value) return "Date unavailable";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const statusColor = (status) => {
+  switch (String(status || "").toLowerCase()) {
+    case "completed":
+      return "teal";
+    case "cancelled":
+      return "red";
+    case "pending":
+      return "yellow";
+    case "confirmed":
+      return "blue";
+    default:
+      return "gray";
+  }
+};
+
+const StatCard = ({ title, value, icon: Icon, color }) => (
+  <Card
+    withBorder
+    radius="lg"
+    padding="lg"
+    style={{
+      transition: "transform 180ms ease, box-shadow 180ms ease",
+    }}
+  >
+    <Group justify="space-between" align="flex-start" wrap="nowrap">
+      <Box style={{ minWidth: 0 }}>
+        <Text size="sm" c="dimmed" fw={500}>
+          {title}
+        </Text>
+
+        <Title order={2} mt={10} fw={700}>
+          {value ?? 0}
+        </Title>
+      </Box>
+
+      <ThemeIcon size={48} radius="md" variant="light" color={color}>
+        <Icon size={25} stroke={1.7} />
+      </ThemeIcon>
+    </Group>
+  </Card>
+);
+
+const SectionCard = ({ title, description, children, action }) => (
+  <Card withBorder radius="lg" padding="lg" h="100%">
+    <Group justify="space-between" align="flex-start" mb="lg">
+      <Box>
+        <Title order={4}>{title}</Title>
+        {description && (
+          <Text size="sm" c="dimmed" mt={4}>
+            {description}
+          </Text>
+        )}
+      </Box>
+      {action}
+    </Group>
+
+    {children}
+  </Card>
+);
+
+const EmptyState = ({ message }) => (
+  <Center py={35}>
+    <Stack align="center" gap="xs">
+      <ThemeIcon size={46} radius="xl" variant="light" color="gray">
+        <IconCalendar size={23} />
+      </ThemeIcon>
+      <Text size="sm" c="dimmed" ta="center">
+        {message}
+      </Text>
+    </Stack>
+  </Center>
+);
+
 const Dashboard = () => {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
       const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("Your session has expired. Please log in again.");
+      }
 
       const response = await API.get("/dashboard", {
         headers: {
@@ -44,251 +146,376 @@ const Dashboard = () => {
       });
 
       setDashboard(response.data);
-    } catch (error) {
-      console.error("Dashboard error:", error);
+    } catch (err) {
+      console.error("Dashboard error:", err);
 
-      setError(error.response?.data?.message || "Failed to load dashboard");
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to load dashboard. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [fetchDashboard]);
 
-  if (loading) {
+  if (loading && !dashboard) {
     return (
-      <Center h={300}>
-        <Loader />
-      </Center>
+      <Container size="xl" py="xl">
+        <Stack gap="xl">
+          <Skeleton height={35} width={220} radius="md" />
+          <Skeleton height={18} width={300} radius="md" />
+
+          <SimpleGrid cols={{ base: 1, xs: 2, md: 3, xl: 5 }}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Skeleton key={index} height={115} radius="lg" />
+            ))}
+          </SimpleGrid>
+
+          <Skeleton height={280} radius="lg" />
+          <SimpleGrid cols={{ base: 1, md: 2 }}>
+            <Skeleton height={280} radius="lg" />
+            <Skeleton height={280} radius="lg" />
+          </SimpleGrid>
+        </Stack>
+      </Container>
     );
   }
 
-  if (error) {
+  if (error && !dashboard) {
     return (
-      <Center h={300}>
-        <Text c="red">{error}</Text>
-      </Center>
+      <Container size="xl" py="xl">
+        <Alert
+          icon={<IconAlertCircle size={20} />}
+          title="Unable to load dashboard"
+          color="red"
+          radius="lg"
+        >
+          <Stack gap="sm">
+            <Text size="sm">{error}</Text>
+            <Group>
+              <ActionIcon
+                variant="light"
+                color="red"
+                size="lg"
+                onClick={fetchDashboard}
+                aria-label="Retry loading dashboard"
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+              <Text
+                size="sm"
+                fw={600}
+                style={{ cursor: "pointer" }}
+                onClick={fetchDashboard}
+              >
+                Try again
+              </Text>
+            </Group>
+          </Stack>
+        </Alert>
+      </Container>
     );
   }
 
-  if (!dashboard) {
-    return null;
-  }
+  if (!dashboard) return null;
 
-  const { stats, todayAppointments, upcomingAppointments, recentPatients } =
-    dashboard;
+  const stats = dashboard.stats || {};
+  const todayAppointments = dashboard.todayAppointments || [];
+  const upcomingAppointments = dashboard.upcomingAppointments || [];
+  const recentPatients = dashboard.recentPatients || [];
 
   const statCards = [
     {
       title: "Active Patients",
       value: stats.totalPatients,
       icon: IconUsers,
+      color: "blue",
     },
     {
       title: "Active Doctors",
       value: stats.totalDoctors,
       icon: IconStethoscope,
+      color: "violet",
     },
     {
       title: "Today's Appointments",
       value: stats.todayAppointments,
       icon: IconCalendar,
+      color: "cyan",
     },
     {
       title: "Completed",
       value: stats.completedAppointments,
       icon: IconCircleCheck,
+      color: "teal",
     },
     {
       title: "Cancelled",
       value: stats.cancelledAppointments,
       icon: IconCircleX,
+      color: "red",
     },
   ];
 
   return (
-    <Stack gap="xl">
-      <div>
-        <Title order={2}>Dashboard</Title>
+    <Box bg="var(--mantine-color-body)" mih="100vh" py="xl">
+      <Container size="xl">
+        <Stack gap="xl">
+          {/* Header */}
+          <Group justify="space-between" align="center">
+            <Box>
+              <Title order={2} fw={800}>
+                Clinic Dashboard
+              </Title>
+              <Text c="dimmed" size="sm" mt={5}>
+                Monitor your clinic's activity and appointments.
+              </Text>
+            </Box>
 
-        <Text c="dimmed" mt={4}>
-          Overview of your clinic
-        </Text>
-      </div>
+            <Tooltip label="Refresh dashboard">
+              <ActionIcon
+                variant="light"
+                size="xl"
+                radius="md"
+                onClick={fetchDashboard}
+                loading={loading}
+                aria-label="Refresh dashboard"
+              >
+                <IconRefresh size={20} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
 
-      {/* Statistics */}
-      <SimpleGrid
-        cols={{
-          base: 1,
-          sm: 2,
-          md: 3,
-          lg: 5,
-        }}
-      >
-        {statCards.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <Card
-              key={item.title}
-              withBorder
-              shadow="sm"
-              padding="lg"
+          {error && (
+            <Alert
+              color="yellow"
+              icon={<IconAlertCircle size={18} />}
               radius="md"
+              title="Refresh issue"
             >
-              <Group justify="space-between">
-                <div>
-                  <Text size="sm" c="dimmed">
-                    {item.title}
-                  </Text>
+              {error}
+            </Alert>
+          )}
 
-                  <Text fw={700} size="xl" mt={5}>
-                    {item.value}
-                  </Text>
-                </div>
+          {/* Statistics */}
+          <SimpleGrid cols={{ base: 1, xs: 2, md: 3, xl: 5 }}>
+            {statCards.map((item) => (
+              <StatCard key={item.title} {...item} />
+            ))}
+          </SimpleGrid>
 
-                <Icon size={28} stroke={1.6} />
-              </Group>
-            </Card>
-          );
-        })}
-      </SimpleGrid>
+          {/* Today's appointments */}
+          <SectionCard
+            title="Today's Appointments"
+            description={`${todayAppointments.length} scheduled appointment(s)`}
+          >
+            {todayAppointments.length === 0 ? (
+              <EmptyState message="No appointments scheduled for today." />
+            ) : (
+              <Table.ScrollContainer minWidth={720}>
+                <Table
+                  striped
+                  highlightOnHover
+                  verticalSpacing="md"
+                  horizontalSpacing="md"
+                >
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Time</Table.Th>
+                      <Table.Th>Patient</Table.Th>
+                      <Table.Th>Doctor</Table.Th>
+                      <Table.Th>Reason</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
 
-      {/* Today's appointments */}
-      <Card withBorder shadow="sm" radius="md">
-        <Title order={4} mb="md">
-          Today's Appointments
-        </Title>
+                  <Table.Tbody>
+                    {todayAppointments.map((appointment) => (
+                      <Table.Tr key={appointment._id}>
+                        <Table.Td>
+                          <Group gap={6} wrap="nowrap">
+                            <IconClock
+                              size={16}
+                              color="var(--mantine-color-dimmed)"
+                            />
+                            <Text size="sm" fw={500}>
+                              {appointment.appointmentTime || "—"}
+                            </Text>
+                          </Group>
+                        </Table.Td>
 
-        {todayAppointments.length === 0 ? (
-          <Text c="dimmed">No appointments scheduled for today.</Text>
-        ) : (
-          <Table.ScrollContainer minWidth={700}>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Time</Table.Th>
-                  <Table.Th>Patient</Table.Th>
-                  <Table.Th>Doctor</Table.Th>
-                  <Table.Th>Reason</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
+                        <Table.Td>
+                          <Text size="sm" fw={600}>
+                            {appointment.patient?.name || "N/A"}
+                          </Text>
+                        </Table.Td>
 
-              <Table.Tbody>
-                {todayAppointments.map((appointment) => (
-                  <Table.Tr key={appointment._id}>
-                    <Table.Td>{appointment.appointmentTime}</Table.Td>
+                        <Table.Td>
+                          <Text size="sm">
+                            {appointment.doctor?.name
+                              ? `Dr. ${appointment.doctor.name}`
+                              : "N/A"}
+                          </Text>
+                        </Table.Td>
 
-                    <Table.Td>{appointment.patient?.name || "N/A"}</Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c="dimmed" lineClamp={1}>
+                            {appointment.reason || "—"}
+                          </Text>
+                        </Table.Td>
 
-                    <Table.Td>{appointment.doctor?.name || "N/A"}</Table.Td>
+                        <Table.Td>
+                          <Badge
+                            color={statusColor(appointment.status)}
+                            variant="light"
+                            radius="sm"
+                          >
+                            {appointment.status || "Unknown"}
+                          </Badge>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+            )}
+          </SectionCard>
 
-                    <Table.Td>{appointment.reason || "-"}</Table.Td>
-
-                    <Table.Td>
-                      <Badge
-                        color={
-                          appointment.status === "completed" ? "green" : "blue"
-                        }
+          {/* Upcoming appointments and recent patients */}
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+            <SectionCard
+              title="Upcoming Appointments"
+              description="Your next scheduled visits"
+            >
+              {upcomingAppointments.length === 0 ? (
+                <EmptyState message="No upcoming appointments." />
+              ) : (
+                <Stack gap="sm">
+                  {upcomingAppointments.map((appointment) => (
+                    <Card
+                      key={appointment._id}
+                      withBorder
+                      radius="md"
+                      padding="md"
+                    >
+                      <Group
+                        justify="space-between"
+                        align="center"
+                        wrap="nowrap"
                       >
-                        {appointment.status}
-                      </Badge>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
-        )}
-      </Card>
+                        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                          <Avatar color="blue" radius="md">
+                            <IconUser size={20} />
+                          </Avatar>
 
-      {/* Upcoming + recent patients */}
-      <SimpleGrid
-        cols={{
-          base: 1,
-          md: 2,
-        }}
-      >
-        {/* Upcoming appointments */}
-        <Card withBorder shadow="sm" radius="md">
-          <Title order={4} mb="md">
-            Upcoming Appointments
-          </Title>
+                          <Box style={{ minWidth: 0 }}>
+                            <Text fw={600} size="sm" lineClamp={1}>
+                              {appointment.patient?.name || "N/A"}
+                            </Text>
 
-          {upcomingAppointments.length === 0 ? (
-            <Text c="dimmed">No upcoming appointments.</Text>
-          ) : (
-            <Stack gap="sm">
-              {upcomingAppointments.map((appointment) => (
-                <Card key={appointment._id} withBorder padding="sm">
-                  <Group justify="space-between">
-                    <div>
-                      <Text fw={600}>{appointment.patient?.name || "N/A"}</Text>
+                            <Text size="xs" c="dimmed" lineClamp={1}>
+                              {appointment.doctor?.name
+                                ? `Dr. ${appointment.doctor.name}`
+                                : "Doctor not assigned"}
+                            </Text>
+                          </Box>
+                        </Group>
 
-                      <Text size="sm" c="dimmed">
-                        Dr. {appointment.doctor?.name || "N/A"}
-                      </Text>
-                    </div>
+                        <Box ta="right" style={{ flexShrink: 0 }}>
+                          <Text size="sm" fw={600}>
+                            {formatDate(appointment.appointmentDate)}
+                          </Text>
+                          <Text size="xs" c="dimmed" mt={3}>
+                            {appointment.appointmentTime || "Time TBD"}
+                          </Text>
+                        </Box>
+                      </Group>
 
-                    <div>
-                      <Text size="sm" fw={500}>
-                        {appointment.appointmentDate}
-                      </Text>
+                      <Group justify="flex-end" mt="sm">
+                        <Badge
+                          color={statusColor(appointment.status)}
+                          variant="light"
+                          size="sm"
+                        >
+                          {appointment.status || "Scheduled"}
+                        </Badge>
+                      </Group>
+                    </Card>
+                  ))}
+                </Stack>
+              )}
+            </SectionCard>
 
-                      <Text size="sm" c="dimmed">
-                        {appointment.appointmentTime}
-                      </Text>
-                    </div>
-                  </Group>
-                </Card>
-              ))}
-            </Stack>
-          )}
-        </Card>
+            <SectionCard
+              title="Recent Patients"
+              description="Latest patient registrations"
+            >
+              {recentPatients.length === 0 ? (
+                <EmptyState message="No patients registered yet." />
+              ) : (
+                <Table.ScrollContainer minWidth={360}>
+                  <Table verticalSpacing="md" horizontalSpacing="xs">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Patient</Table.Th>
+                        <Table.Th>Phone</Table.Th>
+                        <Table.Th>Gender</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
 
-        {/* Recent patients */}
-        <Card withBorder shadow="sm" radius="md">
-          <Title order={4} mb="md">
-            Recent Patients
-          </Title>
+                    <Table.Tbody>
+                      {recentPatients.map((patient) => (
+                        <Table.Tr key={patient._id}>
+                          <Table.Td>
+                            <Group gap="sm" wrap="nowrap">
+                              <Avatar color="teal" radius="xl" size="sm">
+                                {patient.name?.charAt(0)?.toUpperCase() || "P"}
+                              </Avatar>
 
-          {recentPatients.length === 0 ? (
-            <Text c="dimmed">No patients registered yet.</Text>
-          ) : (
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Patient</Table.Th>
-                  <Table.Th>Phone</Table.Th>
-                  <Table.Th>Gender</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
+                              <Box>
+                                <Text size="sm" fw={600}>
+                                  {patient.name || "N/A"}
+                                </Text>
+                                <Text size="xs" c="dimmed">
+                                  {patient.patientId || "No patient ID"}
+                                </Text>
+                              </Box>
+                            </Group>
+                          </Table.Td>
 
-              <Table.Tbody>
-                {recentPatients.map((patient) => (
-                  <Table.Tr key={patient._id}>
-                    <Table.Td>
-                      <Text fw={500}>{patient.name}</Text>
+                          <Table.Td>
+                            <Group gap={5} wrap="nowrap">
+                              {patient.phone && (
+                                <IconPhone
+                                  size={14}
+                                  color="var(--mantine-color-dimmed)"
+                                />
+                              )}
+                              <Text size="sm">{patient.phone || "—"}</Text>
+                            </Group>
+                          </Table.Td>
 
-                      <Text size="xs" c="dimmed">
-                        {patient.patientId}
-                      </Text>
-                    </Table.Td>
-
-                    <Table.Td>{patient.phone || "-"}</Table.Td>
-
-                    <Table.Td>{patient.gender || "-"}</Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          )}
-        </Card>
-      </SimpleGrid>
-    </Stack>
+                          <Table.Td>
+                            <Text size="sm" tt="capitalize">
+                              {patient.gender || "—"}
+                            </Text>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
+              )}
+            </SectionCard>
+          </SimpleGrid>
+        </Stack>
+      </Container>
+    </Box>
   );
 };
 
